@@ -1,6 +1,5 @@
 Flask==2.0.1
 flask-socketio==5.1.1
-gevent==21.8.0
 gunicorn==20.0.4
 pandas
 requests
