@@ -1,4 +1,3 @@
-pip install celery redis
 import os
 import pandas as pd
 import io
