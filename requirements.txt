@@ -5,3 +5,4 @@ gunicorn
 pandas
 requests
 beautifulsoup4
+Werkzeug==2.0.3
