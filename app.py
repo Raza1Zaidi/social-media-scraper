@@ -2,34 +2,31 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, request, send_file, render_template_string, jsonify
-import io
 from flask_socketio import SocketIO, emit
-import time  # For simulating progress
+import io
 
-# Initialize Flask and SocketIO
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Define social media base URLs to look for
+# Define social media base URLs
 social_platforms = {
     "Facebook": "facebook.com",
     "LinkedIn": "linkedin.com",
     "GitHub": "github.com",
-    "Twitter": ["twitter.com", "x.com"]  # Both twitter.com and x.com for Twitter
+    "Twitter": ["twitter.com", "x.com"]
 }
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36'
 }
 
-# Function to extract social media links from a given domain
+# Extract social links
 def extract_social_links(url):
-    links = {platform: None for platform in social_platforms.keys()}  # Initialize with None
+    links = {platform: None for platform in social_platforms.keys()}
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-
         for anchor in soup.find_all("a", href=True):
             href = anchor["href"]
             for platform, base_urls in social_platforms.items():
@@ -38,23 +35,27 @@ def extract_social_links(url):
                         links[platform] = href
                 elif base_urls in href and not links[platform]:
                     links[platform] = href
-
-    except requests.RequestException as e:
-        print(f"Failed to fetch {url}: {e}")
-
+    except requests.RequestException:
+        pass
     return links
 
+# Main function with progress tracking
 def run_social_scraping(df):
     results = []
-    for domain in df['domain']:
+    total_domains = len(df)
+    for i, domain in enumerate(df['domain']):
         if not domain.startswith('http'):
             domain = "http://" + domain
         social_links = extract_social_links(domain)
         social_links["Domain"] = domain
         results.append(social_links)
-    results_df = pd.DataFrame(results)
-    return results_df
+        
+        # Emit progress
+        socketio.emit('progress', {'percentage': int((i + 1) / total_domains * 100)}, broadcast=True)
+    
+    return pd.DataFrame(results)
 
+# Frontend and upload handling
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form_html = '''
@@ -63,14 +64,25 @@ def index():
       <head><title>Social Scraper</title></head>
       <body>
         <h2>Upload CSV with Domains to Scrape Social Links</h2>
-        <form method="post" enctype="multipart/form-data">
+        <form id="uploadForm" method="post" enctype="multipart/form-data">
           <label>Upload your CSV file:</label>
           <input type="file" name="file" accept=".csv">
           <button type="submit">Scrape Social Links</button>
         </form>
+        <div id="progress">
+          <p>Progress: <span id="progressPercent">0%</span></p>
+        </div>
         {% if error_message %}
           <p style="color: red;">{{ error_message }}</p>
         {% endif %}
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+        <script>
+          const socket = io();
+          socket.on('progress', (data) => {
+            document.getElementById('progressPercent').innerText = data.percentage + '%';
+          });
+        </script>
       </body>
     </html>
     '''
@@ -82,14 +94,13 @@ def index():
             file = request.files['file']
             try:
                 df = pd.read_csv(file)
-            except Exception as e:
+            except Exception:
                 return render_template_string(form_html, error_message="Invalid file format. Please upload a valid CSV file.")
 
             if 'domain' not in df.columns:
                 return render_template_string(form_html, error_message="Invalid CSV format. The file must contain a 'domain' column.")
 
             output_df = run_social_scraping(df)
-
             output = io.BytesIO()
             output_df.to_csv(output, index=False)
             output.seek(0)
@@ -102,29 +113,5 @@ def index():
 
     return render_template_string(form_html)
 
-# New code for progress tracking
-@app.route('/start', methods=['POST'])
-def start_scraping():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-
-    file = request.files['file']
-    try:
-        df = pd.read_csv(file)
-    except Exception as e:
-        return jsonify({'error': 'Invalid CSV format'}), 400
-
-    total_domains = len(df)
-    for i, domain in enumerate(df['domain']):
-        # Simulate processing with a sleep (replace with actual processing logic)
-        time.sleep(1)
-
-        # Emit progress
-        socketio.emit('progress', {'percentage': int((i + 1) / total_domains * 100)})
-
-    return jsonify({'message': 'Scraping completed!'})
-
-# Run the Flask app with SocketIO
 if __name__ == '__main__':
-    port = 5000  # Default port
-    socketio.run(app, host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=5000)
