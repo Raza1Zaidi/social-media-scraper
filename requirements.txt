@@ -3,3 +3,5 @@ pandas
 requests
 beautifulsoup4
 gunicorn
+flask-socketio
+eventlet
