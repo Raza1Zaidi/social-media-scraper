@@ -100,3 +100,41 @@ def index():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+# Existing imports and code...
+from flask_socketio import SocketIO, emit
+import time  # For simulating progress
+import pandas as pd
+from bs4 import BeautifulSoup
+import requests
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+# Existing code...
+
+# New code for progress tracking
+@app.route('/start', methods=['POST'])
+def start_scraping():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    try:
+        df = pd.read_csv(file)
+    except Exception as e:
+        return jsonify({'error': 'Invalid CSV format'}), 400
+
+    total_domains = len(df)
+    for i, domain in enumerate(df['domain']):
+        # Simulate processing with a sleep (replace with actual processing logic)
+        time.sleep(1)
+
+        # Emit progress
+        socketio.emit('progress', {'percentage': int((i + 1) / total_domains * 100)})
+
+    return jsonify({'message': 'Scraping completed!'})
+
+# Run the Flask app with SocketIO
+if __name__ == '__main__':
+    socketio.run(app, port=5000)
+
