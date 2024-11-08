@@ -1,10 +1,14 @@
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, request, send_file, render_template_string
+from flask import Flask, request, send_file, render_template_string, jsonify
 import io
+from flask_socketio import SocketIO, emit
+import time  # For simulating progress
 
+# Initialize Flask and SocketIO
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 # Define social media base URLs to look for
 social_platforms = {
@@ -98,23 +102,6 @@ def index():
 
     return render_template_string(form_html)
 
-if __name__ == "__main__":
-   if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))  # Use the port from environment variables
-    app.run(host='0.0.0.0', port=port)  # Bind to all network interfaces
-# Existing imports and code...
-from flask_socketio import SocketIO, emit
-import time  # For simulating progress
-import pandas as pd
-from bs4 import BeautifulSoup
-import requests
-
-app = Flask(__name__)
-socketio = SocketIO(app)
-
-# Existing code...
-
 # New code for progress tracking
 @app.route('/start', methods=['POST'])
 def start_scraping():
@@ -139,5 +126,5 @@ def start_scraping():
 
 # Run the Flask app with SocketIO
 if __name__ == '__main__':
-    socketio.run(app, port=5000)
-
+    port = 5000  # Default port
+    socketio.run(app, host='0.0.0.0', port=port)
