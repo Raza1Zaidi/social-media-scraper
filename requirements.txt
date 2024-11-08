@@ -1,6 +1,7 @@
 Flask==2.0.1
 flask-socketio==5.1.1
 eventlet==0.31.0
+gunicorn
 pandas
 requests
 beautifulsoup4
