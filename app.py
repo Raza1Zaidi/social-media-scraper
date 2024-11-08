@@ -1,12 +1,11 @@
+import os
+import time
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 from flask import Flask, request, send_file, render_template_string, jsonify
-import io
 from flask_socketio import SocketIO, emit
-import time  # For simulating progress
+from bs4 import BeautifulSoup
+import requests
 
-# Initialize Flask and SocketIO
 app = Flask(__name__)
 socketio = SocketIO(app)
 
@@ -46,12 +45,18 @@ def extract_social_links(url):
 
 def run_social_scraping(df):
     results = []
-    for domain in df['domain']:
+    total_domains = len(df)
+    for i, domain in enumerate(df['domain']):
         if not domain.startswith('http'):
             domain = "http://" + domain
         social_links = extract_social_links(domain)
         social_links["Domain"] = domain
         results.append(social_links)
+
+        # Emit progress to the client
+        socketio.emit('progress', {'percentage': int((i + 1) / total_domains * 100)})
+        time.sleep(1)  # Simulate delay (remove in production)
+
     results_df = pd.DataFrame(results)
     return results_df
 
@@ -60,7 +65,17 @@ def index():
     form_html = '''
     <!doctype html>
     <html>
-      <head><title>Social Scraper</title></head>
+      <head>
+        <title>Social Scraper</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+        <script type="text/javascript">
+          var socket = io.connect('http://' + document.domain + ':' + location.port);
+          socket.on('progress', function(data) {
+            document.getElementById("progress").style.width = data.percentage + '%';
+            document.getElementById("progress").innerHTML = data.percentage + '%';
+          });
+        </script>
+      </head>
       <body>
         <h2>Upload CSV with Domains to Scrape Social Links</h2>
         <form method="post" enctype="multipart/form-data">
@@ -68,12 +83,16 @@ def index():
           <input type="file" name="file" accept=".csv">
           <button type="submit">Scrape Social Links</button>
         </form>
+        <div style="margin-top: 20px;">
+          <div id="progress" style="width: 0%; background-color: green; color: white; padding: 5px; text-align: center;">0%</div>
+        </div>
         {% if error_message %}
           <p style="color: red;">{{ error_message }}</p>
         {% endif %}
       </body>
     </html>
     '''
+
     if request.method == 'POST':
         try:
             if 'file' not in request.files:
@@ -95,14 +114,14 @@ def index():
             output.seek(0)
 
             return send_file(output, as_attachment=True, download_name="social_media_links_output.csv", mimetype='text/csv')
-        
+
         except Exception as e:
             print("Error during file processing:", e)
             return render_template_string(form_html, error_message="An unexpected error occurred during processing. Please try again.")
 
     return render_template_string(form_html)
 
-# New code for progress tracking
+# SocketIO event for scraping start
 @app.route('/start', methods=['POST'])
 def start_scraping():
     if 'file' not in request.files:
@@ -124,7 +143,5 @@ def start_scraping():
 
     return jsonify({'message': 'Scraping completed!'})
 
-# Run the Flask app with SocketIO
 if __name__ == '__main__':
-    port = 5000  # Default port
-    socketio.run(app, host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=5000)
