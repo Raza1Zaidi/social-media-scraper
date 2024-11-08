@@ -1,4 +1,4 @@
-import pandas as pd
+]import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, request, send_file, render_template_string, jsonify
