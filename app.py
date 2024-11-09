@@ -2,12 +2,12 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, request, send_file, render_template_string, jsonify
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, emit
 import io
-import time
 
-# Initialize Flask and SocketIO
+# Initialize Flask and SocketIO for real-time updates
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key'
 socketio = SocketIO(app)
 
 # Define social media base URLs to look for
@@ -44,35 +44,40 @@ def extract_social_links(url):
 
     return links
 
-# Main scraping function with progress updates
 def run_social_scraping(df):
     results = []
     total_domains = len(df)
-
+    
+    # Process each domain and update progress after every 10 domains
     for i, domain in enumerate(df['domain']):
         if not domain.startswith('http'):
             domain = "http://" + domain
         social_links = extract_social_links(domain)
         social_links["Domain"] = domain
         results.append(social_links)
+        
+        # Emit progress update every 10 domains
+        if (i + 1) % 10 == 0 or i == total_domains - 1:
+            progress = int((i + 1) / total_domains * 100)
+            socketio.emit('progress', {'progress': progress})
+    
+    return pd.DataFrame(results)
 
-        # Emit progress every 10 domains processed to avoid excessive updates
-        if (i + 1) % 10 == 0 or (i + 1) == total_domains:
-            socketio.emit('progress', {'percentage': int((i + 1) / total_domains * 100)}, broadcast=True)
-
-        # Delay between requests to manage load
-        time.sleep(0.1)
-
-    results_df = pd.DataFrame(results)
-    return results_df
-
-# HTML form and progress bar in the front end
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form_html = '''
     <!doctype html>
     <html>
-      <head><title>Social Scraper</title></head>
+      <head>
+        <title>Social Scraper</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+        <script type="text/javascript" charset="utf-8">
+            var socket = io();
+            socket.on('progress', function(data) {
+                document.getElementById('progress').innerText = "Progress: " + data.progress + "%";
+            });
+        </script>
+      </head>
       <body>
         <h2>Upload CSV with Domains to Scrape Social Links</h2>
         <form method="post" enctype="multipart/form-data">
@@ -80,26 +85,10 @@ def index():
           <input type="file" name="file" accept=".csv">
           <button type="submit">Scrape Social Links</button>
         </form>
-        <div id="progress-container" style="display: none;">
-          <p>Processing... <span id="progress-text">0%</span></p>
-          <progress id="progress-bar" value="0" max="100"></progress>
-        </div>
+        <p id="progress">Progress: 0%</p>
         {% if error_message %}
           <p style="color: red;">{{ error_message }}</p>
         {% endif %}
-        <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.3/socket.io.min.js"></script>
-        <script>
-          const socket = io();
-          const progressContainer = document.getElementById("progress-container");
-          const progressBar = document.getElementById("progress-bar");
-          const progressText = document.getElementById("progress-text");
-
-          socket.on('progress', (data) => {
-              progressContainer.style.display = "block";
-              progressBar.value = data.percentage;
-              progressText.textContent = data.percentage + "%";
-          });
-        </script>
       </body>
     </html>
     '''
@@ -117,7 +106,7 @@ def index():
             if 'domain' not in df.columns:
                 return render_template_string(form_html, error_message="Invalid CSV format. The file must contain a 'domain' column.")
 
-            # Run the social scraping with progress updates
+            # Run social scraping in chunks
             output_df = run_social_scraping(df)
 
             output = io.BytesIO()
@@ -132,7 +121,5 @@ def index():
 
     return render_template_string(form_html)
 
-# Run the Flask app with SocketIO
-if __name__ == '__main__':
-    port = 5000  # Default port
-    socketio.run(app, host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=5000)
