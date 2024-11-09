@@ -1,7 +1,16 @@
-Flask
-flask-socketio
-pandas
-requests
-beautifulsoup4
-dnspython==2.2.1
+# Flask and related packages
+Flask==2.2.5
+Flask-SocketIO==5.3.2
+
+# Web scraping and data handling
+pandas==1.5.3
+requests==2.31.0
+beautifulsoup4==4.11.2
+
+# Compatibility requirements for eventlet and dnspython
 eventlet==0.30.2
+dnspython==2.2.1
+
+# Additional dependencies
+gevent==21.8.0  # Required by Flask-SocketIO as a fallback
+gevent-websocket==0.10.1  # WebSocket support for real-time updates
