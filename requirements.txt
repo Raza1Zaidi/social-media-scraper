@@ -1,17 +1,7 @@
-pip==24.3.1
-# Flask and Flask-SocketIO
-Flask==2.2.5
-Flask-SocketIO==5.3.2
-
-# Web scraping and data handling
-pandas==1.5.3
-requests==2.31.0
-beautifulsoup4==4.11.2
-
-# Compatibility packages for async support
-eventlet==0.30.2
-dnspython==2.2.1
-
-# Gevent and WebSocket support
-gevent==21.8.0
-gevent-websocket==0.10.1
+flask
+flask-socketio
+pandas
+requests
+beautifulsoup4
+gunicorn
+python-dotenv
