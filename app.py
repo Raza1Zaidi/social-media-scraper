@@ -87,14 +87,19 @@ def index():
           <input type="file" name="file" accept=".csv">
           <button type="submit">Scrape Social Links</button>
         </form>
+
+        <!-- Google Ad Code for Right-Side Ad -->
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8299632901990149"
+            crossorigin="anonymous"></script>
+
         <p id="progress">Processed: 0 / 0 domains</p>
+
         {% if error_message %}
           <p style="color: red;">{{ error_message }}</p>
         {% endif %}
       </body>
     </html>
     '''
-
     if request.method == 'POST':
         if 'file' not in request.files:
             return render_template_string(form_html, error_message="No file uploaded. Please upload a CSV file.")
